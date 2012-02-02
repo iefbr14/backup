@@ -1,0 +1,38 @@
+#!/bin/bash
+
+if [ $# -eq 0 ] ; then
+	echo "No host specified"
+	exit 1
+fi
+
+set -e
+
+HOST="$1"
+
+
+ssh root@$HOST 'id' >/dev/null;
+ssh root@$HOST 'cat /proc/mounts' | while read fs mp type rest ; do
+	case "$type" in
+	rootfs|ext2|ext3|ext4)
+		if [ "$mp" = / ] ; then
+			continue;
+		fi
+		echo "+ $mp" >>Dirs.tmp
+	;;
+
+	*)	echo "- $mp  ## $type $fs" >>Dirs.tmp
+	esac
+done
+exit 0
+
+mkdir $HOST
+
+if [ ! -f "Include/$HOST" ] ; then
+	cat Example/include Dirs.tmp >> "Include/$HOST"
+fi
+
+
+touch Include/$HOST.force
+#rdiff-machine $HOST
+
+rm Dirs.tmp

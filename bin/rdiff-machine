@@ -1,0 +1,34 @@
+#!/bin/sh
+
+set -e
+
+if [ $# -ne 1 ] ; then
+        echo "Usage: $0 machine"
+        exit 1
+fi
+
+machine="$1";
+echo "==============[ $machine ]=============="
+
+if [ ! -f Include/$machine ] ; then
+        echo "No Include list."
+        exit 1
+fi
+
+if [ ! -d "$machine/rdiff-backup-data" ] ; then
+        FORCE='--force'
+fi
+if [ -f "Include/$machine.force" ] ; then
+        FORCE='--force'
+fi
+
+sed -e '/^#/d' -e '/^$/d' -e 's/ *#.*//' Include/$machine | \
+   rdiff-backup $FORCE \
+        --exclude-filelist-stdin \
+        --print-statistics \
+        $machine::/    $machine
+
+
+if [ -f "Include/$machine.force" ] ; then
+	rm "Include/$machine.force"
+fi

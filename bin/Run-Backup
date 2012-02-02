@@ -1,0 +1,9 @@
+#!/bin/sh
+
+set -x
+cd /b
+echo "Start: $(date)";
+
+/usr/local/bin/guard-cmd -l ccsys    make all
+
+echo "Finished: $(date)";

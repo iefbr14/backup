@@ -1,0 +1,35 @@
+#
+# we don't /proc
+#
+- /proc
+- /sys
+- /selinux
+- /var/named/chroot/proc
+- /var/lib/nfs/rpc_pipefs
+- /home/*/.gvfs
+- /home/*/.gtk-bookmarks/.gvfs
+
+#
+# /tmp, /var/tmp
+#
+- /tmp
+- /var/tmp
+
+#
+# mail queues
+#
+- /var/spool/postfix/active/
+- /var/spool/postfix/defer/
+- /var/spool/postfix/deferred/
+- /var/spool/postfix/incoming/
+
+#
+# log files
+#
+- /var/log
+
+
+#
+# Include everything else
+#
++ /
