@@ -9,6 +9,9 @@ set -e
 
 HOST="$1"
 
+if [ -f Dirs.tmp ] ; then
+	rm Dirs.tmp
+fi
 
 ssh root@$HOST 'id' >/dev/null;
 ssh root@$HOST 'cat /proc/mounts' | while read fs mp type rest ; do
@@ -23,16 +26,14 @@ ssh root@$HOST 'cat /proc/mounts' | while read fs mp type rest ; do
 	*)	echo "- $mp  ## $type $fs" >>Dirs.tmp
 	esac
 done
-exit 0
 
-mkdir $HOST
-
-if [ ! -f "Include/$HOST" ] ; then
-	cat Example/include Dirs.tmp >> "Include/$HOST"
+if [ ! -d "$HOST" ] ; then
+	mkdir "$HOST"
 fi
 
+if [ ! -f "Include/$HOST" ] ; then
+	mv Dirs.tmp Include/"$HOST"
+fi
 
 touch Include/$HOST.force
-#rdiff-machine $HOST
-
-rm Dirs.tmp
+echo "Run:      rdiff-machine $HOST"

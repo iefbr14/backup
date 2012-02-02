@@ -1,9 +1,24 @@
-#!/bin/sh
+#!/bin/bash
 
-set -x
-cd /b
+set -e
+cd /b/backup
+
+PATH=/b/backup/bin:$PATH
+
 echo "Start: $(date)";
 
-/usr/local/bin/guard-cmd -l ccsys    make all
+DOW=`date +%a`
+
+if [ $# -eq 0 ] ; then
+	set -- *.*.*
+fi
+
+for HOST in "$@" ; do 
+ (
+	echo "Start: $HOST $(date)";
+	guard-cmd -l backup bin/rdiff-machine "$HOST"
+	echo "Finished: $HOST $(date)";
+ ) 2>&1 | tee Logs/"$DOW.$HOST"
+done
 
 echo "Finished: $(date)";

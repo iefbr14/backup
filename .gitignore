@@ -1,6 +1,8 @@
 Include/
 Old
 
+Dirs.tmp
+
 *.*.org
 *.*.com
 *.*.net
