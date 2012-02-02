@@ -24,7 +24,7 @@ fi
 for HOST in "$@" ; do 
  (
 	echo "Start: $HOST $(date)";
-	guard-cmd -l backup bin/rdiff-machine "$HOST"
+	guard-cmd -w -l backup bin/rdiff-machine "$HOST"
 	echo "Finished: $HOST $(date)";
  ) 2>&1 | tee Logs/"$DOW.$HOST"
 done
