@@ -1,0 +1,201 @@
+#!/usr/bin/perl -w
+
+=head1 NAME
+
+guard-cmd - used to protect long running command run from cron.
+
+=head1 SYNOPIS
+
+guard-cmd [options...] cmd
+
+=head1 DESCRIPTION
+
+The gurad-cmd creates a lock file (normally by the same name
+as the command be run) for a program so that two copies will
+not be run at the same time.
+
+The listed command (cmd) will then be run and when it
+exits the clock file will be removed.
+
+Sending a SIGINT to guard-cmd will remove the lock.
+
+The exit status of guard-cmd will be the exit status of the command
+that it ran.
+
+=head1 OPTIONS
+
+=item -x - turn debugging on.
+
+=item -l : - use lock : as the lock name 
+
+the default lock name is the basename of the command name
+
+=item -L : - place locks in : rather than /var/lock/guard
+
+=head1 EXAMPLES
+
+Cron entry to run every 5 minutes 
+
+  0/5 * * * * guard-cmd /root/bin/test-script with args
+
+The lock file will be /var/lock/guard/LCK..test-script
+
+=head1 AUTHOR
+
+ Drew Sullivan <drew@ss.org>
+ (c) 2003 Systems Software
+ Released under the GPL
+ $Id:$
+
+=cut
+
+#=item -d : - use : as the default diretory.
+#=item -w - wait for command to complete
+
+sub usage {
+	die <<"EOF";
+Usage: $0 [options...] args...
+   -- used to guard the running of long lived commands run from cron.
+Options:
+   -x     -- turn Debugging on.
+   -l :   -- use lock : as lock name
+   -L :   -- place locks in : rather than /var/lock/guard
+   -o     -- log to an aged log file.
+   -t     -- time stamp log
+   -w     -- wait to run
+EOF
+}
+
+use strict;
+use Getopt::Std;
+
+my(%Opt);
+&getopts('xL:l:otw', \%Opt) || usage;
+
+my($Debug) = $Opt{x} || 0;
+
+unless (@ARGV) {
+	warn "No command specifed\n";
+	usage();
+}
+
+my($Lock)  = $Opt{l} || $ARGV[0];
+my($Ldir)  = $Opt{L} || "/var/lock/guard";
+my($Ageo)  = $Opt{o} || 0;
+my($Stamp) = $Opt{t} || 0;
+my($Wait)  = $Opt{w} || 0;
+
+$Lock =~ s=.*/==;
+
+mkdir($Ldir, 1777) unless -d $Ldir;
+
+if ($Wait) {
+	wait_lock("$Ldir/LCK..$Lock");
+} else {
+	check_lock("$Ldir/LCK..$Lock");
+}
+
+open(L, ">$Ldir/LCK..$$") or die "Can't create lock work file: $Ldir/LCK..$$ ($!)\n";
+print L "$$\n";
+close(L);
+
+unless (link("$Ldir/LCK..$$", "$Ldir/LCK..$Lock")) {
+	check_lock("$Ldir/LCK..$Lock");
+	unless (link("$Ldir/LCK..$$", "$Ldir/LCK..$Lock")) {
+		die "Can't get lock.\n";
+	}
+}
+unlink("$Ldir/LCK..$$");
+
+$SIG{INT} = sub {
+	warn "Interupt: Removing lock: $Lock\n";
+	unlink("$Ldir/LCK..$Lock");
+};
+
+if ($Ageo) {
+	age("$Lock.8.log", "$Lock.9.log");
+	age("$Lock.7.log", "$Lock.8.log");
+	age("$Lock.6.log", "$Lock.7.log");
+	age("$Lock.5.log", "$Lock.6.log");
+	age("$Lock.4.log", "$Lock.5.log");
+	age("$Lock.3.log", "$Lock.4.log");
+	age("$Lock.2.log", "$Lock.3.log");
+	age("$Lock.1.log", "$Lock.2.log");
+	age("$Lock.0.log", "$Lock.1.log");
+	age("$Lock.log",   "$Lock.0.log");
+
+	if ($Stamp) {
+		open(STDOUT, "| /usr/local/bin/guard-age > $Lock.log")  or die "Can't redirect stdout";
+	} else {
+		open(STDOUT, "> $Lock.log")  or die "Can't redirect stdout";
+	}
+	open(STDERR, ">&STDOUT")     or die "Can't dup stdout";
+}
+
+my($rc) = system(@ARGV);
+unlink("$Ldir/LCK..$Lock");
+
+exit($rc);
+
+sub check_lock {
+	my($lock) = @_;
+	my($pid, $cnt);
+
+	return unless -f $lock;
+
+	open(L, "< $lock\0") or die "Can't open lock $lock ($!)\n";
+	$pid = <L>;
+	chomp $pid;
+	close(L);
+
+	$cnt = kill 0, $pid;
+
+	if ($cnt) {
+		warn "It's alive!  (process: $pid in $lock)\n" if $Debug;
+		exit 0;
+	}
+
+	warn "It's dead jim. (process: $pid in $lock)\n" if $Debug;
+	if (unlink($lock)) {
+		warn "Removed broken lock $lock\n";
+	} else {
+		die "Can't remove broken lock $lock ($!)\n";
+	}
+}
+
+sub wait_lock {
+	my($lock) = @_;
+	my($pid, $cnt);
+
+	for (;;) {
+		return unless -f $lock;
+
+		open(L, "< $lock\0") or die "Can't open lock $lock ($!)\n";
+		$pid = <L>;
+		chomp $pid;
+		close(L);
+
+		$cnt = kill 0, $pid;
+
+		if ($cnt) {
+			warn "It's alive!  (process: $pid in $lock)\n" if $Debug;
+			sleep 60;
+			next;
+		}
+
+		warn "It's dead jim. (process: $pid in $lock)\n" if $Debug;
+		if (unlink($lock)) {
+			warn "Removed broken lock $lock\n";
+		} else {
+			die "Can't remove broken lock $lock ($!)\n";
+		}
+	}
+}
+
+sub age {
+	my($old, $new) = @_;
+
+	if (-f $old) {
+		rename($old, $new);
+	}
+}

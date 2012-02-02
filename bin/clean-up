@@ -1,9 +1,6 @@
 #!/bin/sh
 
-(
-
 set -e
-cd /b
 
 echo "Space: before"
 echo
@@ -11,12 +8,17 @@ df -h
 echo
 
 if [ $# -eq 0 ] ; then
-	set -- bliss rock silver drugs threefish sodium
+	set -- *.*.*
 fi
 
 for i in "$@" ; do 
 	if [ ! -d "$i" ] ; then
 		echo "No such directory $i -- not cleaned"
+		continue
+	fi
+
+	if [ ! -d "$i/rdiff-backup-data" ] ; then
+		echo "Not a backup $i -- not cleaned"
 		continue
 	fi
    (
@@ -33,5 +35,3 @@ echo
 echo "Space: after"
 echo
 df -h
-
-) 2>&1 | mail -s "Mica weekly incremental cleanup" drew@ss.org 

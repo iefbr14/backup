@@ -1,0 +1,5 @@
+#!/bin/sh
+
+CWD=`/bin/pwd`
+echo "CWD: $CWD"
+echo "SN: $0"

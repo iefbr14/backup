@@ -1,13 +1,21 @@
 #!/bin/bash
 
 set -e
-cd /b/backup
 
-PATH=/b/backup/bin:$PATH
+if [ ! -d "bin" ] ; then
+	echo "Please run in your backup directory."
+	exit 1
+fi
+
+PATH=`pwd`/bin:$PATH
 
 echo "Start: $(date)";
 
 DOW=`date +%a`
+
+if [ "$DOW" = 'Sun' ] ; then
+	clean-up 2>&1 | tee "Logs/$DOW=Clean-Up.log"
+fi
 
 if [ $# -eq 0 ] ; then
 	set -- *.*.*
@@ -22,3 +30,5 @@ for HOST in "$@" ; do
 done
 
 echo "Finished: $(date)";
+
+#) 2>&1 | mail -s "Mica weekly incremental cleanup" drew@ss.org 
