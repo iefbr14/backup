@@ -27,7 +27,6 @@ umask 000
 sed -e '/^#/d' -e '/^$/d' -e 's/ *#.*//' Include/$machine | \
    rdiff-backup $FORCE \
 	--exclude-sockets \
-	--exclude-other-filesystems \
         --exclude-filelist-stdin \
         --print-statistics \
         $machine::/    $machine
