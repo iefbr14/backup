@@ -25,7 +25,9 @@ if [ ! -d Old ] ; then
 	mkdir Old
 fi
 
-mv Logs/$DOW* Old/
+if mv -f Logs/$DOW* Old/ ; then
+	:
+fi
 
 if [ $# -eq 0 ] ; then
 	set -- *.*.*
