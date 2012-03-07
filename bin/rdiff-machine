@@ -26,10 +26,10 @@ umask 000
 
 sed -e '/^#/d' -e '/^$/d' -e 's/ *#.*//' Include/$machine | \
    rdiff-backup $FORCE \
-        --exclude-sockets \
-        --exclude-filelist-stdin \
-        --print-statistics \
-        $machine::/    $machine
+      --exclude-sockets \
+      --exclude-filelist-stdin \
+      --print-statistics \
+      $machine::/    $machine
 
 
 if [ -f "Include/$machine.force" ] ; then
