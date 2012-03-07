@@ -26,7 +26,7 @@ for i in "$@" ; do
 	echo "Start `date`: $i"
 	cd $i
 	echo "=---------------------- $i ----------------------"
-	rdiff-backup --force --remove-older-than 90D . 
+	rdiff-backup --force --remove-older-than 65D . 
    )
 done
 

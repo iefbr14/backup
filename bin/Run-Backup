@@ -13,6 +13,8 @@ echo "Start: $(date)";
 
 DOW=`date +%a`
 
+rm -f Logs/"$DOW"[.=]*
+
 if [ "$DOW" = 'Sun' ] ; then
 	clean-up 2>&1 | tee "Logs/$DOW=Clean-Up.log"
 fi

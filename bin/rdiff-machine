@@ -24,6 +24,7 @@ fi
 
 sed -e '/^#/d' -e '/^$/d' -e 's/ *#.*//' Include/$machine | \
    rdiff-backup $FORCE \
+        --exclude-sockets \
         --exclude-filelist-stdin \
         --print-statistics \
         $machine::/    $machine
