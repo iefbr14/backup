@@ -19,6 +19,18 @@ if [ "$DOW" = 'Sun' ] ; then
 	clean-up 2>&1 | tee "Logs/$DOW=Clean-Up.log"
 fi
 
+if [ ! -d Logs ] ; then
+	mkdir Logs
+fi
+
+if [ ! -d Old ] ; then
+	mkdir Old
+fi
+
+if mv -f Logs/$DOW* Old/ ; then
+	:
+fi
+
 if [ $# -eq 0 ] ; then
 	set -- *.*.*
 fi
@@ -32,5 +44,3 @@ for HOST in "$@" ; do
 done
 
 echo "Finished: $(date)";
-
-#) 2>&1 | mail -s "Mica weekly incremental cleanup" drew@ss.org 

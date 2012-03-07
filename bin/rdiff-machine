@@ -22,6 +22,8 @@ if [ -f "Include/$machine.force" ] ; then
         FORCE='--force'
 fi
 
+umask 000
+
 sed -e '/^#/d' -e '/^$/d' -e 's/ *#.*//' Include/$machine | \
    rdiff-backup $FORCE \
         --exclude-sockets \
