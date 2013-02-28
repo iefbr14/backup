@@ -9,6 +9,7 @@ fi
 
 machine="$1";
 echo "==============[ $machine ]=============="
+echo "Start: $machine $(date)";
 
 if [ ! -f Include/$machine ] ; then
         echo "No Include list."
@@ -35,3 +36,5 @@ sed -e '/^#/d' -e '/^$/d' -e 's/ *#.*//' Include/$machine | \
 if [ -f "Include/$machine.force" ] ; then
 	rm "Include/$machine.force"
 fi
+
+echo "Finished: $machine $(date)";
