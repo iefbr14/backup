@@ -9,9 +9,16 @@ set -e
 
 HOST="$1"
 
-if [ -f Dirs.tmp ] ; then
-	rm Dirs.tmp
-fi
+cat >Dirs.tmp <<'EOF'
+# List mounted file systems we do want here
+# + /boot
+# + /home
+
+#===========================================================================
+#
+# we don't do /proc and other synthetic file systems
+#
+EOF
 
 ssh root@$HOST 'id' >/dev/null;
 ssh root@$HOST 'cat /proc/mounts' | while read fs mp type rest ; do

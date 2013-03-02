@@ -47,16 +47,22 @@ Usage: $0 [options...] [args]...
 Options:
    -x     -- turn Debugging on.
    -d     -- dry run (don't do backups).
-   -c     -- clean backups first
+   -c     -- clean up archives
+
+   -A     -- all sites auto
+   -R     -- rotate logs
 EOF
 }
 
 my(%Opt);
-getopts('xd', \%Opt) || usage;
+getopts('xdCAR', \%Opt) || usage;
 
 my($Debug)   = $Opt{x} || 0;
-my($Cleanup) = $Opt{c} || 0;
 my($Dryrun)  = $Opt{d} || 0;
+my($Cleanup) = $Opt{c} || 0;
+
+my($Allsite) = $Opt{A} || 0;
+my($Rotate ) = $Opt{R} || 0;
 
 if ( ! -d 'bin' ) {
 	die "Please run in your backup directory."
@@ -69,7 +75,7 @@ print strftime("$DOW Backup: %Y-%m-%d.%T\n", @now);
 
 make_path('Logs', 'Old', 'Run', { verbose => 1, mode=> 0644 });
 
-if (@ARGV == 0) {
+if ($Rotate) {
 	for my $log (<Logs/$DOW.*>) {
 		my($to) = $log; $to =~ s/^Logs/Old/;
 
@@ -78,14 +84,17 @@ if (@ARGV == 0) {
 		} else {
 			print "+ mv LOG $log => $to\n";
 
-	#		rename($log, $to) or warn "Can't rename $log => $to\n";
+			rename($log, $to) or warn "Can't rename $log => $to\n";
 		}
 	}
+}
 
+if ($Allsite && @ARGV == 0) {
+	$Cleanup = ($DOW eq 'Sun');
 	@ARGV = <*.*.*>;
 }
 
-if ( $Cleanup || $DOW eq 'Sun' ) {
+if ($Cleanup) {
 	for my $HOST (@ARGV) {
 		clean_up($HOST);
 	}
@@ -95,33 +104,38 @@ for my $HOST (@ARGV) {
 	backup($HOST);
 }
 
-print strftime("Done: %Y-%m-%d.%T\n", localtime);
+print strftime("$DOW Done: %Y-%m-%d.%T\n", localtime);
 
-
-sub run {
-	my($cmd) = join(' ', @_);
-
-	print "+ $cmd\n";
-
-	my($rc) = system(@_);
-
-	return if $rc == 0;
-
-	warn "Command failed: rc = $rc\n";
-}
 
 sub backup {
 	my($machine) = @_;
 
-	print "==============[ $machine ]==============\n";
-	print strftime("Start: $machine %Y-%m-%d.%T\n", localtime);
+	unless (open(LOG, ">> Logs/$DOW.$machine")) {
+		warn "Can't log to: Logs/$DOW.$machine ($!)\n";
+		return;
+	}
+		
+	plog("==============[ $machine ]==============");
+
+	if (! -d $machine) {
+		perr("Back-up $machine not setup, skipping");
+		return;
+	}
+
+	if ($Allsite && -M "$machine/rdiff-backup-data" < 0.4) {
+		perr("Back-up $machine too soon ago, skipping");
+		return;
+	}
+
+
+	plog(strftime("Start: $machine %Y-%m-%d.%T", localtime));
 
 	unless (open(I, "Include/$machine")) {
-		warn "Can't open include list: Include/$machine ($!)\n";
+		perr("Can't open include list: Include/$machine ($!)");
 		return;
 	}
 	unless (open(O, "> Run/$machine")) {
-		warn "Can't open include list: Run/$machine ($!)\n";
+		perr("Can't open include list: Run/$machine ($!)");
 		return;
 	}
 	
@@ -138,18 +152,19 @@ sub backup {
 
 	my(%mp);
 
+	my($mode, $mp);
 	while (<I>) {
 		next if /^\s*$/;
 		next if /^\s*#/;
 
 
 		chomp;
-		my($mode, $mp) = split(' ', $_);
+		($mode, $mp) = split(' ', $_);
 
 		if ($mode eq '+') {
-			print O "$mp\n";
+			print O "+ $mp\n";
 		} else {
-			print O "$mode $mp\n";
+			print O "$mp\n";
 		}
 
 		$mp{$mp} = [ $mode ];
@@ -160,47 +175,53 @@ sub backup {
 
 
 	unless (open(I, "ssh root\@$machine 'cat /proc/mounts'|")) {
-		print "Can't ssh $machine to get mounts\n";
+		perr("Can't ssh $machine to get mounts");
 	}
 
 	while (<I>) {
 		chomp;
 		my ($fs, $mp, $type, @rest) = split(' ');
 
-		my($mode) = guess_mode($type);
+		my($guess) = guess_mode($type);
 
-		print "# L $mode $mp # $type\n" if $Debug;
+		print "# L $guess $mp # $type\n" if $Debug;
 
 		next if $mp eq '/';
 
 		# if we already have this one.
 		next if defined $mp{$mp}[0];
 
-		warn "Mount point $mp => $fs => $type @rest new\n";
-		print "Logically added: - $mp\n";
-		print O "- $mp\n";
+		perr("Mount point $mp => $fs => $type @rest new");
+		plog("Logically added: - $mp");
+		$mode = '-';
+		print O "$mp\n";
 	}
+
+	if ($mode ne '-') {
+		perr("Last item in Include/$machine is not an exclude (rdiff-bug)");
+		print O "/tmp/rdiff-bug-needs-excludes-as-last\n";
+	}
+
 #	print O "/\n";
 	close(O);
 
-	run('guard-cmd', '-w', '-l', 'backup',
-		'rdiff-backup', @FORCE, 
+	run('rdiff-backup', @FORCE, 
 		'--exclude-sockets',
 		'--exclude-other-filesystems',
-		'--include-globbing-filelist', "Run/$machine",
+		'--exclude-globbing-filelist', "Run/$machine",
 		'--print-statistics',
 		$machine."::/", $machine
 	);
 		
 	if (@FORCE) {
 		if ($Dryrun) {
-			print "# rm Include/$machine.force\n";
+			plog("# rm Include/$machine.force");
 		} else {
 			unlink("Include/$machine.force");
 		}
 	}
 
-	print strftime("Finish: $machine %Y-%m-%d.%T\n", localtime);
+	plog(strftime("Finish: $machine %Y-%m-%d.%T", localtime));
 }
 
 sub guess_mode {
@@ -233,13 +254,56 @@ sub guess_mode {
 	return '+' if $type eq 'ext3';
 	return '+' if $type eq 'ext4';
 
-	warn "Unknown type: $type\n";
+	perr("Unknown type: $type");
 	return '-';
 }
 
 sub clean_up {
 	my($machine) = @_;
 
+	open(LOG, ">> $DOW=Clean-Up.log");
+
 	### BUG move cleanup code here.
-	run("bin/clean-up $machine 2>&1 | tee -a Logs/$DOW=Clean-Up.log");
+	run("bin/clean-up $machine");
+
+	close(LOG);
+}
+
+sub run {
+	my($cmd) = join(' ', @_);
+
+	plog("+ $cmd");
+
+	unshift(@_, 'bin/guard-cmd', '-w', '-l', 'backup');
+
+
+	if ($Dryrun) {
+		plog("## $cmd");
+		return;
+	}
+
+	print "++ $cmd\n" if $Debug;
+
+	unless (open(CMD, "$cmd 2>&1 |")) {
+		perr("Can't run $cmd ($!)");
+		return;
+	}
+	while (<CMD>) {
+		chomp;
+		plog($_);
+	}
+	close(CMD);
+	return if $? == 0;
+
+	perr("Command failed: rc = $?");
+}
+
+sub plog {
+	print LOG @_, "\n";
+	print @_, "\n";
+}
+
+sub perr {
+	print LOG    @_, "\n";
+	print STDERR @_, "\n";
 }
