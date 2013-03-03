@@ -18,13 +18,20 @@
 
 =head1 DEPENDENCIES
 
+Depends on rdiff-backup
+
 =head1 INCOMPATIBILITIES
 
 =head1 BUGS AND LIMITATIONS
 
 =head1 AUTHOR
 
+Drew Sullivan
+
 =head1 LICENSE COPYRIGHT
+
+(c) Drew Sullivan 2013
+Release under the GPL
 
 =cut
 
@@ -46,16 +53,18 @@ Usage: $0 [options...] [args]...
    --
 Options:
    -x     -- turn Debugging on.
-   -d     -- dry run (don't do backups).
+   -d     -- dry run only
    -c     -- clean up archives
 
    -A     -- all sites auto
    -R     -- rotate logs
+
+   -C :   -- Clean-up Age (90D)
 EOF
 }
 
 my(%Opt);
-getopts('xdCAR', \%Opt) || usage;
+getopts('xdcARC:', \%Opt) || usage;
 
 my($Debug)   = $Opt{x} || 0;
 my($Dryrun)  = $Opt{d} || 0;
@@ -63,6 +72,7 @@ my($Cleanup) = $Opt{c} || 0;
 
 my($Allsite) = $Opt{A} || 0;
 my($Rotate ) = $Opt{R} || 0;
+my($Age)     = $Opt{C} || '90D';
 
 if ( ! -d 'bin' ) {
 	die "Please run in your backup directory."
@@ -70,23 +80,19 @@ if ( ! -d 'bin' ) {
 
 my(@now) = localtime;
 my($DOW) = strftime("%a", @now);
+my($MON) = strftime("%b", @now);
+my($DAY) = strftime("%d", @now);
 
-print strftime("$DOW Backup: %Y-%m-%d.%T\n", @now);
+open(LOG, '>/dev/null');	# no machine specific log to start
+
+pdate("$DOW Backup") if $Allsite;
 
 make_path('Logs', 'Old', 'Run', { verbose => 1, mode=> 0644 });
 
+
 if ($Rotate) {
-	for my $log (<Logs/$DOW.*>) {
-		my($to) = $log; $to =~ s/^Logs/Old/;
-
-		if ($Dryrun) {
-			print "# LOG: $log => $to\n";
-		} else {
-			print "+ mv LOG $log => $to\n";
-
-			rename($log, $to) or warn "Can't rename $log => $to\n";
-		}
-	}
+	rotate(<Logs/$DOW.*>);
+	rotate(<Logs/$MON.*>);
 }
 
 if ($Allsite && @ARGV == 0) {
@@ -95,17 +101,14 @@ if ($Allsite && @ARGV == 0) {
 }
 
 if ($Cleanup) {
-	for my $HOST (@ARGV) {
-		clean_up($HOST);
-	}
+	clean_up(@ARGV);
 }
 
 for my $HOST (@ARGV) {
 	backup($HOST);
 }
 
-print strftime("$DOW Done: %Y-%m-%d.%T\n", localtime);
-
+pdate("$DOW Done") if $Allsite;
 
 sub backup {
 	my($machine) = @_;
@@ -115,20 +118,20 @@ sub backup {
 		return;
 	}
 		
-	plog("==============[ $machine ]==============");
+	plog("# ==============[ $machine ]==============");
 
 	if (! -d $machine) {
 		perr("Back-up $machine not setup, skipping");
 		return;
 	}
 
-	if ($Allsite && -M "$machine/rdiff-backup-data" < 0.4) {
+	if (!$Cleanup && $Allsite && -M "$machine/rdiff-backup-data" < 0.4) {
 		perr("Back-up $machine too soon ago, skipping");
 		return;
 	}
 
 
-	plog(strftime("Start: $machine %Y-%m-%d.%T", localtime));
+	plog("Start: $machine");
 
 	unless (open(I, "Include/$machine")) {
 		perr("Can't open include list: Include/$machine ($!)");
@@ -161,7 +164,9 @@ sub backup {
 		chomp;
 		($mode, $mp) = split(' ', $_);
 
-		if ($mode eq '+') {
+		if ($mode eq '/') {
+			print O "+ $mp/\n";
+		} elsif ($mode eq '+') {
 			print O "+ $mp\n";
 		} else {
 			print O "$mp\n";
@@ -205,10 +210,13 @@ sub backup {
 #	print O "/\n";
 	close(O);
 
+	# the order of the excludes are very important here.
+	# --exclude-other-filesystem is need after globbing
+	# or globbing will not cross fs boundaries
 	run('rdiff-backup', @FORCE, 
 		'--exclude-sockets',
-		'--exclude-other-filesystems',
 		'--exclude-globbing-filelist', "Run/$machine",
+		'--exclude-other-filesystems',
 		'--print-statistics',
 		$machine."::/", $machine
 	);
@@ -221,7 +229,7 @@ sub backup {
 		}
 	}
 
-	plog(strftime("Finish: $machine %Y-%m-%d.%T", localtime));
+	pdate("Finish");
 }
 
 sub guess_mode {
@@ -258,15 +266,58 @@ sub guess_mode {
 	return '-';
 }
 
+sub rotate {
+	for my $log (@_) {
+		my($to) = $log; $to =~ s/^Logs/Old/;
+
+		if ($Dryrun) {
+			print "# LOG: $log => $to\n";
+		} else {
+			print "+ mv LOG $log => $to\n";
+
+			rename($log, $to) or warn "Can't rename $log => $to\n";
+		}
+	}
+}
+
+
 sub clean_up {
-	my($machine) = @_;
+	open(LOG, ">> Logs/$MON.$DAY.Clean-Up.log");
 
-	open(LOG, ">> $DOW=Clean-Up.log");
+	plog("Space before:");
+	run("df", "-h", ".");
+	plog("");
 
-	### BUG move cleanup code here.
-	run("bin/clean-up $machine");
+	for my $HOST (@_) {
+		clean_host($HOST);
+	}
+
+	plog("======================= Finish ======================");
+	pdate("Finish Cleanup");
+	plog("Space after:");
+	run("df", "-h", ".");
+	plog("");
 
 	close(LOG);
+}
+
+sub clean_host {
+	my($host) = @_;
+
+	plog("======================= $host ======================");
+	if ( ! -d "$host" ) {
+		perr("No such directory $host -- not cleaned");
+		return;
+	}
+
+	if ( ! -d "$host/rdiff-backup-data" ) {
+		perr("Not a backup $host -- not cleaned");
+		return;
+	}
+
+	pdate("Start clean-up");
+	plog("=---------------------- $host ----------------------");
+	run('rdiff-backup', '--force', '--remove-older-than', $Age, $host); 
 }
 
 sub run {
@@ -305,5 +356,11 @@ sub plog {
 
 sub perr {
 	print LOG    @_, "\n";
-	print STDERR @_, "\n";
+	print '!!! ', @_, "\n";
+}
+
+sub pdate {
+	my($msg) = @_;
+
+	plog("# $msg: ".strftime("%Y-%m-%d.%T", localtime));
 }

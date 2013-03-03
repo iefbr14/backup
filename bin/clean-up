@@ -6,7 +6,7 @@ AGE=90D
 
 echo "Space: before"
 echo
-df -h
+df -h .
 echo
 
 if [ $# -eq 0 ] ; then
@@ -36,4 +36,4 @@ echo "Finished `date`"
 echo
 echo "Space: after"
 echo
-df -h
+df -h .
