@@ -92,7 +92,7 @@ make_path('Logs', 'Old', 'Run', { verbose => 1, mode=> 0644 });
 
 if ($Rotate) {
 	rotate(<Logs/$DOW.*>);
-	rotate(<Logs/$MON.*>);
+#	rotate(<Logs/$MON.*>);
 }
 
 if ($Allsite && @ARGV == 0) {
@@ -181,6 +181,7 @@ sub backup {
 
 	unless (open(I, "ssh root\@$machine 'cat /proc/mounts'|")) {
 		perr("Can't ssh $machine to get mounts");
+		return;
 	}
 
 	while (<I>) {
@@ -326,6 +327,8 @@ sub run {
 	plog("+ $cmd");
 
 	unshift(@_, 'bin/guard-cmd', '-w', '-l', 'backup');
+
+	my($cmd) = join(' ', @_);
 
 
 	if ($Dryrun) {
