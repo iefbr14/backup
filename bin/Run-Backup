@@ -112,6 +112,7 @@ pdate("$DOW Done") if $Allsite;
 
 sub backup {
 	my($machine) = @_;
+	my($start) = time;
 
 	unless (open(LOG, ">> Logs/$DOW.$machine")) {
 		warn "Can't log to: Logs/$DOW.$machine ($!)\n";
@@ -230,7 +231,10 @@ sub backup {
 		}
 	}
 
-	pdate("Finish");
+	my($elaps) = time - $start;
+	my($h_elaps) = sprintf("%d:%02d:%02d",
+		int($elaps/3600), int($elaps/60)%60, int($elaps%60));
+	pdate("Finish ($h_elaps)");
 }
 
 sub guess_mode {
@@ -328,8 +332,7 @@ sub run {
 
 	unshift(@_, 'bin/guard-cmd', '-w', '-l', 'backup');
 
-	my($cmd) = join(' ', @_);
-
+	$cmd = join(' ', @_);
 
 	if ($Dryrun) {
 		plog("## $cmd");
