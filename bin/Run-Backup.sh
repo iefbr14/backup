@@ -25,11 +25,11 @@ if mv -f Logs/$DOW* Old/ ; then
 	:
 fi
 
-if [ "$DOW" = 'Sun' ] ; then
-	clean-up 2>&1 | tee "Logs/$DOW=Clean-Up.log"
-fi
-
 if [ $# -eq 0 ] ; then
+	if [ "$DOW" = 'Sun' ] ; then
+		clean-up 2>&1 | tee "Logs/$DOW=Clean-Up.log"
+	fi
+
 	set -- *.*.*
 fi
 
