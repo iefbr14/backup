@@ -40,7 +40,9 @@ fi
 
 if [ ! -f "Include/$HOST" ] ; then
 	mv Dirs.tmp Include/"$HOST"
+else
+	echo "Include/$HOST already exists, check against: Dirs.tmp"
 fi
 
 touch Include/$HOST.force
-echo "Run:      rdiff-machine $HOST"
+echo "Run:      bin/Run-Backup $HOST"

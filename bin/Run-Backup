@@ -85,7 +85,7 @@ my($DAY) = strftime("%d", @now);
 
 open(LOG, '>/dev/null');	# no machine specific log to start
 
-pdate("$DOW Backup") if $Allsite;
+pdate("Backup") if $Allsite;
 
 make_path('Logs', 'Old', 'Run', { verbose => 1, mode=> 0644 });
 
@@ -107,8 +107,6 @@ if ($Cleanup) {
 for my $HOST (@ARGV) {
 	backup($HOST);
 }
-
-pdate("$DOW Done") if $Allsite;
 
 sub backup {
 	my($machine) = @_;
@@ -132,7 +130,7 @@ sub backup {
 	}
 
 
-	plog("Start: $machine");
+	pdate("Start: $machine");
 
 	unless (open(I, "Include/$machine")) {
 		perr("Can't open include list: Include/$machine ($!)");
@@ -234,7 +232,7 @@ sub backup {
 	my($elaps) = time - $start;
 	my($h_elaps) = sprintf("%d:%02d:%02d",
 		int($elaps/3600), int($elaps/60)%60, int($elaps%60));
-	pdate("Finish ($h_elaps)");
+	pdate("Done ($h_elaps)");
 }
 
 sub guess_mode {
@@ -297,8 +295,8 @@ sub clean_up {
 		clean_host($HOST);
 	}
 
-	plog("======================= Finish ======================");
-	pdate("Finish Cleanup");
+	plog("======================= Done ======================");
+	pdate("Done Cleanup");
 	plog("Space after:");
 	run("df", "-h", ".");
 	plog("");
@@ -368,5 +366,6 @@ sub perr {
 sub pdate {
 	my($msg) = @_;
 
-	plog("# $msg: ".strftime("%Y-%m-%d.%T", localtime));
+	my($time) = strftime("%Y-%m-%d.%T", localtime);
+	plog("# $MON $DOW $time: $msg");
 }
