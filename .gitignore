@@ -1,5 +1,6 @@
 Include/
 Run/
+Logs/
 Old/
 
 Dirs.tmp
@@ -8,3 +9,4 @@ Dirs.tmp
 *.*.com
 *.*.net
 *.*.ca
+*.*.tk
